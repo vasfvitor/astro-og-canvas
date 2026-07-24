@@ -150,16 +150,17 @@ export async function generateOpenGraphImage({
   // Draw background gradient.
   const bgRect = CanvasKit.XYWHRect(0, 0, width, height);
   const bgPaint = new CanvasKit.Paint();
-  bgPaint.setShader(
-    CanvasKit.Shader.MakeLinearGradient(
-      [0, 0],
-      [0, height],
-      bgGradient.map((rgb) => CanvasKit.Color(...rgb)),
-      null,
-      CanvasKit.TileMode.Clamp
-    )
+  const bgShader = CanvasKit.Shader.MakeLinearGradient(
+    [0, 0],
+    [0, height],
+    bgGradient.map((rgb) => CanvasKit.Color(...rgb)),
+    null,
+    CanvasKit.TileMode.Clamp
   );
+  bgPaint.setShader(bgShader);
   canvas.drawRect(bgRect, bgPaint);
+  bgShader.delete();
+  bgPaint.delete();
 
   // Draw border.
   if (border.width) {
@@ -174,6 +175,7 @@ export async function generateOpenGraphImage({
       'inline-end': isRtl ? edges.left : edges.right,
     };
     canvas.drawLine(...borders[border.side], borderStyle);
+    borderStyle.delete();
   }
 
   // Draw background image.
@@ -212,7 +214,10 @@ export async function generateOpenGraphImage({
       // Draw image
       const srcRect = CanvasKit.XYWHRect(0, 0, bgW, bgH);
       const destRect = CanvasKit.XYWHRect(targetX, targetY, targetW, targetH);
-      canvas.drawImageRect(bgImg, srcRect, destRect, new CanvasKit.Paint());
+      const bgImagePaint = new CanvasKit.Paint();
+      canvas.drawImageRect(bgImg, srcRect, destRect, bgImagePaint);
+      bgImagePaint.delete();
+      bgImg.delete();
     }
   }
 
@@ -231,19 +236,21 @@ export async function generateOpenGraphImage({
 
       // Matrix transform to scale the logo to the desired size.
       const imagePaint = new CanvasKit.Paint();
-      imagePaint.setImageFilter(
-        CanvasKit.ImageFilter.MakeMatrixTransform(
-          CanvasKit.Matrix.scaled(xRatio, yRatio),
-          { filter: CanvasKit.FilterMode.Linear },
-          null
-        )
+      const scaleFilter = CanvasKit.ImageFilter.MakeMatrixTransform(
+        CanvasKit.Matrix.scaled(xRatio, yRatio),
+        { filter: CanvasKit.FilterMode.Linear },
+        null
       );
+      imagePaint.setImageFilter(scaleFilter);
 
       const imageLeft = isRtl
         ? (1 / xRatio) * (width - margin['inline-start']) - logoW
         : (1 / xRatio) * margin['inline-start'];
 
       canvas.drawImage(img, imageLeft, (1 / yRatio) * margin['block-start'], imagePaint);
+      scaleFilter.delete();
+      imagePaint.delete();
+      img.delete();
     }
   }
 
@@ -279,6 +286,8 @@ export async function generateOpenGraphImage({
     const naturalTop = height - margin['block-end'] - para.getHeight();
     const paraTop = Math.max(minTop, Math.min(maxTop, naturalTop));
     canvas.drawParagraph(para, paraLeft, paraTop);
+    para.delete();
+    paragraphBuilder.delete();
   }
 
   // Render canvas to a buffer.
@@ -287,6 +296,7 @@ export async function generateOpenGraphImage({
     image.encodeToBytes(CanvasKit.ImageFormat[format], quality) || new Uint8Array();
 
   // Free any memory our surface might be hanging onto.
+  image.delete();
   surface.dispose();
 
   const imgBuffer = Buffer.from(imageBytes);
