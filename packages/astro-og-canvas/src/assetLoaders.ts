@@ -1,4 +1,4 @@
-import type { CanvasKit, FontMgr } from 'canvaskit-wasm/full';
+import type { CanvasKit, FontMgr, Image } from 'canvaskit-wasm/full';
 import { Buffer } from 'node:buffer';
 import fs from 'node:fs/promises';
 import { createRequire } from 'node:module';
@@ -140,3 +140,26 @@ export const loadImage = async (path: string): Promise<LoadedImage> =>
       return image;
     }
   });
+
+const decodedImages = { cache: new Map<string, Image | null>(), queue: pQueue() };
+
+/**
+ * Decode an image to a CanvasKit `Image`. Backed by an in-memory cache, so a background or
+ * logo shared by every card is decoded once per build instead of once per card.
+ *
+ * The returned `Image` is shared and must not be deleted by callers.
+ *
+ * @param path Path to an image file, e.g. `./src/logo.png`.
+ * @returns The decoded image, or `null` if CanvasKit could not decode it.
+ */
+export const loadDecodedImage = async (path: string): Promise<Image | null> => {
+  const { buffer } = await loadImage(path);
+  return decodedImages.queue(async () => {
+    const cached = decodedImages.cache.get(path);
+    if (cached !== undefined) return cached;
+    const CanvasKit = await getCanvasKit();
+    const decoded = CanvasKit.MakeImageFromEncoded(buffer);
+    decodedImages.cache.set(path, decoded);
+    return decoded;
+  });
+};

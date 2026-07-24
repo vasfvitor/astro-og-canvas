@@ -3,7 +3,7 @@ import { decodeHTMLStrict } from 'entities';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { Buffer } from 'node:buffer';
-import { getCanvasKit, fontManager, loadImage } from './assetLoaders.js';
+import { getCanvasKit, fontManager, loadDecodedImage, loadImage } from './assetLoaders.js';
 import { shorthash } from './shorthash.js';
 import type {
   FontConfig,
@@ -180,7 +180,7 @@ export async function generateOpenGraphImage({
 
   // Draw background image.
   if (bgImage && loadedBg?.buffer) {
-    const bgImg = CanvasKit.MakeImageFromEncoded(loadedBg.buffer);
+    const bgImg = await loadDecodedImage(bgImage.path);
     if (bgImg) {
       let { position = 'center', fit = 'none' } = bgImage;
       if (typeof position === 'string') position = [position, position];
@@ -217,14 +217,13 @@ export async function generateOpenGraphImage({
       const bgImagePaint = new CanvasKit.Paint();
       canvas.drawImageRect(bgImg, srcRect, destRect, bgImagePaint);
       bgImagePaint.delete();
-      bgImg.delete();
     }
   }
 
   // Draw logo.
   let logoHeight = 0;
   if (logo && loadedLogo?.buffer) {
-    const img = CanvasKit.MakeImageFromEncoded(loadedLogo.buffer);
+    const img = await loadDecodedImage(logo.path);
     if (img) {
       const logoH = img.height();
       const logoW = img.width();
@@ -250,7 +249,6 @@ export async function generateOpenGraphImage({
       canvas.drawImage(img, imageLeft, (1 / yRatio) * margin['block-start'], imagePaint);
       scaleFilter.delete();
       imagePaint.delete();
-      img.delete();
     }
   }
 
