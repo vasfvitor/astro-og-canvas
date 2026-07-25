@@ -10,19 +10,20 @@ const debug = (...args: any[]) => console.debug('[astro-og-canvas]', ...args);
 const error = (...args: any[]) => console.error('[astro-og-canvas]', ...args);
 
 /** CanvasKit singleton. */
-let canvasKitSingleton: CanvasKit;
-export async function getCanvasKit(): Promise<CanvasKit> {
-  if (!canvasKitSingleton) {
+let canvasKitSingleton: Promise<CanvasKit> | undefined;
+export function getCanvasKit(): Promise<CanvasKit> {
+  canvasKitSingleton ??= (async () => {
     try {
       const { default: init } = await import('canvaskit-wasm/full');
-      canvasKitSingleton = await init({
+      return await init({
         // TODO: Figure how to reliably resolve this without depending on Node.
         locateFile: (file) => resolve(`canvaskit-wasm/bin/full/${file}`),
       });
     } catch (e) {
+      canvasKitSingleton = undefined;
       throw formatCanvasKitInitError(e);
     }
-  }
+  })();
   return canvasKitSingleton;
 }
 
